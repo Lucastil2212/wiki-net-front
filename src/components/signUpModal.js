@@ -43,7 +43,7 @@ export default function SignUp({ open, handleClose, setCurrentUser }) {
       setUsernameErrorText("Username is too short!");
     }
     axios
-      .post("http://localhost:3001/createUser", {
+      .post("http://184.72.207.15:3001/createUser", {
         username: username,
         password: password,
       })

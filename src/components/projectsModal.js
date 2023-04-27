@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Modal, Box, Typography, Button, IconButton } from "@mui/material";
-import axios from "axios";
 import DeleteIcon from "@mui/icons-material/Delete";
 
 export default function Projects({

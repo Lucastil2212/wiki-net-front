@@ -103,7 +103,7 @@ export default function Dashboard() {
   const getNetworks = () => {
     if (currentUser === "") return;
     axios
-      .get("http://localhost:3001/networks")
+      .get("http://184.72.207.15:3001/networks")
       .then((response) => {
         const data = JSON.parse(response.data);
 
@@ -124,7 +124,7 @@ export default function Dashboard() {
   const createNetwork = () => {
     setNetworkCreated(true);
     axios
-      .post("http://localhost:3001/createNetwork", {
+      .post("http://184.72.207.15:3001/createNetwork", {
         networkName: currentNetworkName,
         userName: currentUser,
         data: {
@@ -141,7 +141,7 @@ export default function Dashboard() {
   };
   const updateNetwork = () => {
     axios
-      .post("http://localhost:3001/updateNetwork", {
+      .post("http://184.72.207.15:3001/updateNetwork", {
         networkName: currentNetworkName,
         userName: currentUser,
         data: {
@@ -260,7 +260,7 @@ export default function Dashboard() {
     handleCloseProjects();
 
     axios
-      .get("http://localhost:3001/networks")
+      .get("http://184.72.207.15:3001/networks")
       .then((response) => {
         const data = JSON.parse(response.data);
 
@@ -297,7 +297,7 @@ export default function Dashboard() {
     handleCloseProjects();
 
     axios
-      .post("http://localhost:3001/delete", {
+      .post("http://184.72.207.15:3001/delete", {
         networkName: network.network,
         userName: currentUser,
       })
