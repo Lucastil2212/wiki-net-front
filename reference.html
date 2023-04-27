@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Quick Wiki</title>
+    <meta charset="utf-8">
+</head>
+
+<body>
+    <h1>Quick Wiki</h1>
+    <div style="margin: 1% 1%">
+        <form>
+            <label for="searchField">Search a topic to get started</label><br>
+            <input type="text" id="searchField" name="search" /> <button type="submit" id="submitButton">Search</button>
+            <button type="button" id="uploadNotes" style="margin-left: 0.5%;  float:right"
+                onclick="showUploadPopup()">Upload Notes</button>
+            <button type="button" id="fit" style="float:right">Center Network</button>
+        </form>
+    </div>
+
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+    <!-- Create a div for the network graph -->
+    <div id="network" style="height: 400px; border: solid black"></div>
+
+
+    <form>
+        <label for="notes">Notes for topic:</label><br>
+        <textarea id="notes" rows="15" style="padding: 2%; width: 100%; visibility:hidden"></textarea>
+        <label for"saveNotes">Save notes to file</label>
+        <button type="button" id="saveNotes">Save notes</button>
+    </form>
+
+
+    <!-- Create a div to display the current wiki page-->
+    <div id="pageDisplay"></div>
+    <script type="text/javascript">
+        var nodeData = [];
+        var edgeData = [];
+
+        var notes = [];
+
+        var currentNodeIndex = 0;
+
+        // create an array with nodes
+        var nodes = new vis.DataSet(nodeData);
+
+        // create an array with edges
+        var edges = new vis.DataSet(edgeData);
+
+        // create a network
+        var container = document.getElementById("network");
+        var data = {
+            nodes: nodes,
+            edges: edges
+        };
+        var options = {};
+        var network = new vis.Network(container, data, options);
+
+        const createRootNode = (name) => {
+            const noteText = document.getElementById("notes")
+            if (noteText.style.visibility == "hidden") {
+                noteText.style.visibility = "visible";
+            }
+
+            let index = 0;
+            if (nodeData.length != 0) { index = nodeData.length; }
+
+
+            nodeData.push({
+                id: index,
+                label: name
+            });
+
+            nodes.update(nodeData);
+
+            fetchWikiPage(name);
+
+            currentNodeIndex = index;
+        }
+
+        const addNode = (name) => {
+
+            let index = nodeData.length;
+
+            nodeData.push({
+                id: index,
+                label: name
+            });
+            edgeData.push({ to: index, from: currentNodeIndex });
+
+            currentNodeIndex = index;
+
+            document.getElementById("notes").value = "";
+
+            nodes.update(nodeData);
+            edges.update(edgeData);
+        }
+        const fetchWikiPage = (name) => {
+            // fetch(`get_wiki_page.php?search=${name}`)
+            fetch(`https://en.wikipedia.org/w/rest.php/v1/page/${name}/html`)
+                .then(response => response.text())
+                .then(html => {
+                    const wikiPage = document.getElementById("pageDisplay");
+                    wikiPage.innerHTML = html;
+
+                    const anchorTags = document.getElementsByTagName("a");
+
+                    const anchorTagsArr = [...anchorTags];
+
+                    anchorTagsArr.forEach((tag, i) => {
+                        const href = anchorTags[i].getAttribute("href");
+
+                        tag.addEventListener('click', e => {
+                            e.preventDefault();
+
+                            const wikiPage = href.slice(2);
+
+                            fetchWikiPage(wikiPage);
+
+                            if (!alreadyFetched(wikiPage)) { addNode(wikiPage) };
+
+                        });
+                    });
+                })
+                .catch(e => console.log(e));
+        }
+
+        network.on('click', (params) => {
+            var clickedNodeId = params.nodes[0];
+            var clickedNode = nodes.get(clickedNodeId);
+
+            if (!clickedNode) return;
+
+            fetchWikiPage(clickedNode.label);
+            currentNodeIndex = clickedNode.id;
+
+            if (notes[currentNodeIndex]) {
+                document.getElementById("notes").value = notes[currentNodeIndex];
+            } else {
+                document.getElementById("notes").value = "";
+            }
+        });
+
+        const alreadyFetched = (page) => {
+
+            var networkNodes = nodes.get();
+
+            for (var node in networkNodes) {
+                if (networkNodes[node].label === page) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        document.getElementById("submitButton").addEventListener("click", (e) => {
+            e.preventDefault();
+
+            document.getElementById("notes").style.visibility = "visible";
+
+            const search = document.getElementById("searchField");
+            const searchValue = search.value;
+
+            createRootNode(searchValue);
+
+            const noteText = document.getElementById("notes")
+            noteText.style.visibility = "visible";
+            noteText.value = "";
+        });
+
+        document.getElementById("notes").addEventListener('input', (e) => {
+            e.preventDefault();
+
+            notes[currentNodeIndex] = e.target.value;
+        });
+
+        document.getElementById("fit").addEventListener('click', (e) => {
+            e.preventDefault();
+            network.moveTo({ position: { x: 0, y: 0 }, scale: 1 });
+        });
+
+        document.getElementById("saveNotes").addEventListener('click', (e) => {
+            e.preventDefault();
+
+            if (!notes.length) return;
+
+            const body = [];
+
+            notes.forEach((data, index) => {
+                if (!notes[index] || !nodeData[index] || notes[index] == "") return;
+
+                body.push({
+                    name: nodeData[index].label,
+                    notes: notes[index]
+                });
+
+            });
+
+            promptDownloadFile(body);
+            fetch('http://eecslab-22.case.edu/~lmt95/p1/save_notes.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ notes: body })
+            })
+                .then(response => response.text())
+                .then(data => console.log(data))
+                .catch(error => console.error(error));
+        });
+
+        const promptDownloadFile = (fileContents) => {
+            console.log(fileContents);
+
+            const fileName = `${fileContents[0]["name"].replace('/[<>:"\/\\\|\?\*#%&{} $!\'@+`=]/', '_')}.txt`;
+
+            let notes = '';
+
+            fileContents.forEach((e, index) => {
+                let name = `${index}. Notes on ${e["name"]}:\n`;
+                let txt = `${e["notes"]}\n\n`;
+
+                notes += name;
+                notes += txt;
+            }
+            );
+
+            // Create a hidden <a> element and set its href attribute to a data URL of the file contents
+            const element = document.createElement("a");
+            element.setAttribute(
+                "href",
+                "data:text/plain;charset=utf-8," + encodeURIComponent(notes)
+            );
+            element.setAttribute("download", fileName);
+
+            // Add the <a> element to the document body and trigger a click event to download the file
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+
+        }
+
+        const showUploadPopup = () => {
+            var popup = window.open("", "Upload File", "width=400,height=200");
+            popup.document.open();
+            popup.document.write("<h1>Select a File to Upload</h1>");
+            popup.document.write("<form id='uploadForm' enctype='multipart/form-data'>");
+            popup.document.write("<input type='file' name='fileToUpload' id='fileToUpload'>");
+            popup.document.write("<br><br>");
+            popup.document.write("<h4><span style=\"color: red\">Warning!</span>All unsaved notes will be lost!</h4>")
+            popup.document.write("<input type='submit' value='Upload'>");
+            popup.document.write("</form>");
+            popup.document.close();
+
+            popup.document.getElementById("uploadForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+                fetchData(event.target);
+            });
+        }
+
+        const fetchData = (form) => {
+            var formData = new FormData(form);
+            fetch('http://eecslab-22.case.edu/~lmt95/p1/upload.php', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.text())
+                .then(text => {
+                    // Display the uploaded text in the popup
+                    var popup = window.open("", "Upload File", "width=400,height=200");
+                    popup.document.open();
+                    popup.document.write("<h1>File Uploaded Successfully</h1>");
+                    popup.document.write("<p>" + text + "</p>");
+                    popup.document.close();
+
+                    buildNewNetwork(text);
+                })
+                .catch(error => console.error(error));
+        }
+
+        const buildNewNetwork = (text) => {
+            //remove <br> tag
+            const cleanString = text.replace(/<br>/g, "");
+
+            console.log(cleanString);
+
+            notes = [];
+            nodeData = [];
+            edgeData = [];
+
+            let currentName = "";
+            let currentNotes = "";
+            let currentLine = "";
+
+            cleanString.split("").forEach((c) => {
+                if (c == "\n") {
+                    if (isName(currentLine)) { //check logic for line that contains the label for this node
+                        let name = getName(currentLine); //extract the name from the current line
+                        createRootNode(name);
+
+                        if (currentNotes != "") {
+                            notes.push(currentNotes);
+                            currentNotes = "";
+                        }
+                    } else {
+                        currentNotes += currentLine;
+                        currentNotes += c;
+                    }
+
+                    currentLine = "";
+                } else {
+                    currentLine += c;
+                }
+            });
+
+            notes.push(currentNotes);
+            nodes.update(nodeData);
+        }
+
+        const isName = (line) => {
+            return !isNaN(line.charAt(0)) && line.includes("Notes on") && (line.charAt(line.length - 1) == ":");
+        }
+
+        const getName = (line) => {
+            let substr = line.substring(0, line.indexOf(":"));
+            let words = substr.split(" ");
+            return words[words.length - 1];
+        }
+    </script>
+</body>
+<html>
